@@ -80,20 +80,28 @@ PRX_W = 1e-3 * 10^(PRX_dBm/10);         % Convert dBm -> W
 P_txbb_norm = mean(abs(tx_shaped_valid).^2);      % Mean Power of normalized waveform
 
 rx_in = tx_shaped_valid * sqrt(PRX_W * 50 / P_txbb_norm);
+noise_in = sqrt(Nin * 50 /2) * ...
+    (randn(size(rx_in)) + 1j*randn(size(rx_in)));
+
+rx_in_noisy = rx_in + noise_in;
 
 P_rx_check_dBm = 10*log10(mean(abs(rx_in).^2)/1e-3/50);
 fprintf('Ισχύς στην είσοδο του δέκτη = %.2f dBm\n', P_rx_check_dBm);
 
-%% 12. 1η βαθμίδα δέκτη: RF BPF ως ισοδύναμη baseband επίδραση
-G_BPF_dB = -1.5;                          % insertion loss 2 dB
+%% ========================================================= 
+% 1η βαθμίδα δέκτη: RF BPF ως ισοδύναμη baseband επίδραση
+G_BPF_dB = -1.5;                          % insertion loss 1.5 dB
 G_BPF_lin = 10^(G_BPF_dB/10);
 NF_BPF_dB = - G_BPF_dB; % Not mentioned in the datasheet
 NF_BPF = helper_funcs.dB_To_Linear(NF_BPF_dB, 'dB');
 
-y_bpf = sqrt(G_BPF_lin) * rx_in;
-[y_bpf_noisy, SNR_out_BPF_dB, bpf_noise] = helper_funcs.Calcualte_noisy_signal(NF_BPF_dB, y_bpf, SNRin_dB);
+y_bpf_clean = sqrt(G_BPF_lin) * rx_in;
+noise_after_bpf_gain = sqrt(G_BPF_lin) * noise_in; 
+y_bpf = sqrt(G_BPF_lin) * rx_in_noisy;
+[y_bpf_noisy, SNR_out_BPF_dB, bpf_NF_noise] = helper_funcs.Calcualte_noisy_signal(NF_BPF_dB, y_bpf, SNRin_dB);
+noise_after_bpf = noise_after_bpf_gain + bpf_NF_noise;
 
-P_bpf_out_dBm = 10*log10(mean(abs(y_bpf).^2)/1e-3/50);
+P_bpf_out_dBm = 10*log10(mean(abs(y_bpf_noisy).^2)/1e-3/50);
 P_bpf_expected_dBm = PRX_dBm + G_BPF_dB;
 fprintf('Expected Power after BPF: %.2f dBm\n', P_bpf_expected_dBm);
 fprintf('Power after BPF: %.2f dBm\n', P_bpf_out_dBm);
@@ -109,15 +117,14 @@ sym_bpf_norm = sym_bpf / sqrt(mean(abs(sym_bpf).^2));
 
 helper_funcs.Plot_Constellation(sym_bpf_norm, "Αστερισμός στην έξοδο του RF BPF");
 
-SNR_out_BPF_calc_dB = helper_funcs.Calculate_SNR(y_bpf, bpf_noise);
+SNR_out_BPF_calc_dB = helper_funcs.Calculate_SNR(y_bpf, noise_after_bpf);
 fprintf('SNR στην έξοδο του BPF = %.2f dB\n', SNR_out_BPF_calc_dB);
 
-evm_percent = helper_funcs.Calculate_EVM(sym_samples, sym_lna);
+evm_percent = helper_funcs.Calculate_EVM(sym_samples, sym_bpf);
 fprintf('EVM στην έξοδο του LNA = %.2f %%\n', evm_percent);
 
 %% =========================================================
 % 15. 2η βαθμίδα δέκτη: LNA
-% =========================================================
 
 G_LNA_dB  = 25;               
 G_LNA_lin = 10^(G_LNA_dB/10);
@@ -126,8 +133,11 @@ NF_LNA = helper_funcs.dB_To_Linear(NF_LNA_dB, 'dB');
 
 % Έξοδος LNA στο complex baseband:
 % το πλάτος του σήματος πολλαπλασιάζεται με sqrt(G)
-y_lna = sqrt(G_LNA_lin) * y_bpf;
-[y_lna_noisy, SNR_out_LNA] = helper_funcs.Calcualte_noisy_signal(NF_LNA_dB, y_lna, SNR_out_BPF_dB);
+y_lna_clean = sqrt(G_LNA_lin) * y_bpf_clean;
+noise_after_lna_gain = sqrt(G_LNA_lin) * noise_after_bpf;
+y_lna = sqrt(G_LNA_lin) * y_bpf_noisy;
+[y_lna_noisy, SNR_out_LNA, LNA_NF_noise] = helper_funcs.Calcualte_noisy_signal(NF_LNA_dB, y_lna, SNR_out_BPF_dB);
+noise_after_LNA = noise_after_lna_gain + LNA_NF_noise;
 
 % Real Part of the signal after the LNA with noise
 helper_funcs.Plot_RF_Signal(t, real(y_lna_noisy), "Real part of signal after LNA");
@@ -141,25 +151,23 @@ helper_funcs.Plot_Constellation(sym_lna_noisy_norm, "Αστερισμός στη
 
 % Power calculations after LNA
 % We expect P_LNA,out = P_BPF,out + 25 dB
-P_lna_out_dBm = 10*log10(mean(abs(y_lna).^2)/1e-3/50);
-P_lna_expected_dBm = P_bpf_out_dBm + G_LNA_dB;
+P_lna_out_dBm = 10*log10(mean(abs(y_lna_noisy).^2)/1e-3/50);
+P_lna_expected_dBm = P_bpf_expected_dBm + G_LNA_dB;
 
 fprintf('Expected Power after LNA: %.2f dBm\n', P_lna_expected_dBm);
 fprintf('Power after LNA: %.2f dBm\n', P_lna_out_dBm);
 
 % Now we calculate the SNR and EVM after LNA
 
-SNR_lna_meas_dB = helper_funcs.Calculate_SNR(y_lna, y_lna_noisy);
+SNR_lna_meas_dB = helper_funcs.Calculate_SNR(y_lna_clean, noise_after_LNA);
 fprintf('SNR στην έξοδο του LNA = %.2f dB\n', SNR_lna_meas_dB);
 
 evm_percent = helper_funcs.Calculate_EVM(sym_samples, sym_lna);
 fprintf('EVM στην έξοδο του LNA = %.2f %%\n', evm_percent);
 
 %% =========================================================
-% 23. 3η βαθμίδα δέκτη: RF Splitter
-% Ο splitter χωρίζει το σήμα σε δύο ίδιους κλάδους (I και Q)
-% και εισάγει απώλεια περίπου -3.5 dB ανά κλάδο
-% =========================================================
+% 3η βαθμίδα δέκτη: RF Splitter
+
 
 G_PS_dB  = -3.5;                    % συνολική απώλεια ανά κλάδο
 G_PS_lin = 10^(G_PS_dB/10);
@@ -167,10 +175,13 @@ NF_PS_dB = - G_PS_dB; % Not mentioned in the datasheet
 NF_PS = helper_funcs.dB_To_Linear(NF_PS_dB, 'dB');
 
 % Έξοδοι splitter στους δύο κλάδους
-y_I_split = sqrt(G_PS_lin) * y_lna;
-y_Q_split = sqrt(G_PS_lin) * y_lna;
-[y_I_split_noisy, SNR_out_I_split] = helper_funcs.Calcualte_noisy_signal(NF_PS_dB, y_lna_noisy, SNR_out_LNA);
-[y_Q_split_noisy, SNR_out_Q_split] = helper_funcs.Calcualte_noisy_signal(NF_PS_dB, y_lna_noisy, SNR_out_LNA);
+y_I_split_clean = sqrt(G_PS_lin) * y_lna_clean;
+noise_after_split_gain = sqrt(G_PS_lin) * noise_after_LNA;
+y_I_split = sqrt(G_PS_lin) * y_lna_noisy;
+y_Q_split = sqrt(G_PS_lin) * y_lna_noisy;
+[y_I_split_noisy, SNR_out_I_split, split_NF_I_noise] = helper_funcs.Calcualte_noisy_signal(NF_PS_dB, y_I_split, SNR_out_LNA);
+[y_Q_split_noisy, SNR_out_Q_split, split_NF_Q_noise] = helper_funcs.Calcualte_noisy_signal(NF_PS_dB, y_Q_split, SNR_out_LNA);
+noise_after_split = noise_after_split_gain + split_NF_I_noise;
 
 helper_funcs.Plot_RF_Signal(t, real(y_I_split_noisy), "Real part of signal after Power Splitter (Branch I)");
 
@@ -181,9 +192,9 @@ sym_I_split_norm = sym_I_split / sqrt(mean(abs(sym_I_split).^2));
 helper_funcs.Plot_Constellation(sym_I_split_norm, "Constellation after RF Splitter (branch I)");
 
 % Υπολογισμός ισχύος ανά κλάδο
-P_I_split_dBm = 10*log10(mean(abs(y_I_split).^2)/1e-3);
-P_Q_split_dBm = 10*log10(mean(abs(y_Q_split).^2)/1e-3);
-P_split_expected_dBm = P_lna_out_dBm + G_PS_dB;
+P_I_split_dBm = 10*log10(mean(abs(y_I_split_noisy).^2) /1e-3 / 50);
+P_Q_split_dBm = 10*log10(mean(abs(y_Q_split_noisy).^2) /1e-3 / 50);
+P_split_expected_dBm = P_lna_expected_dBm + G_PS_dB;
 
 fprintf('Expected Power per branch after Power Splitter: %.2f dBm\n', P_split_expected_dBm);
 fprintf('Power at branch I after Power Splitter: %.2f dBm\n', P_I_split_dBm);
@@ -191,81 +202,56 @@ fprintf('Power at branch Q after Power Splitter: %.2f dBm\n', P_Q_split_dBm);
 
 % Now we calculate the SNR and EVM after Power Spliiter
 
-SNR_PS_dB = helper_funcs.Calculate_SNR(y_I_split, y_I_split_noisy);
+SNR_PS_dB = helper_funcs.Calculate_SNR(y_I_split_clean, noise_after_split);
 fprintf('SNR στην έξοδο του RF Splitter = %.2f dB\n', SNR_PS_dB);
 
 evm_percent = helper_funcs.Calculate_EVM(sym_samples, sym_I_split);
 fprintf('EVM στην έξοδο του RF Splitter = %.2f %%\n', evm_percent);
 
 %% =========================================================
-% 26. 4η βαθμίδα δέκτη: Mixer
-% Στο ισοδύναμο complex baseband μοντέλο η ιδανική υποβίβαση
-% συχνότητας θεωρείται ήδη ενσωματωμένη.
-% Άρα εδώ ο mixer μοντελοποιείται μόνο μέσω της conversion loss.
-% =========================================================
+% 4η βαθμίδα δέκτη: Mixer
 
-G_MIX_dB  = -9;                    % conversion loss από το datasheet
-G_MIX_lin = 10^(G_MIX_dB/10);
+G_MixerI_dB  = -9;                    % conversion loss από το datasheet
+G_MixerI_lin = 10^(G_MixerI_dB/10);
+NF_MixerI_dB = - G_MixerI_dB;
+NF_MixerI = helper_funcs.dB_To_Linear(NF_MixerI_dB, 'dB');
 
-% Χρησιμοποιούμε έναν από τους δύο ίδιους κλάδους του splitter
-% ως είσοδο της βαθμίδας mixer στο ισοδύναμο μοντέλο
-y_mix = sqrt(G_MIX_lin) * y_I_split;
+% We use just one branch of the split
+y_mix_clean = sqrt(G_MixerI_lin) * y_I_split_clean;
+y_mix = sqrt(G_MixerI_lin) * y_I_split_noisy;
+noise_after_mix_gain = sqrt(G_MixerI_lin) * noise_after_split;
+[y_mix_noisy, SNR_out_mixer_dB, mixer_NF_noise] = helper_funcs.Calcualte_noisy_signal(NF_MixerI, y_mix, SNR_out_I_split);
+noise_after_mix = noise_after_mix_gain + mixer_NF_noise;
 
-%% Υπολογισμός ισχύος στην έξοδο του mixer
-P_mix_out_dBm = 10*log10(mean(abs(y_mix).^2)/1e-3);
+helper_funcs.Plot_RF_Signal(t, real(y_mix_noisy), "Real Part of Signal after Mixer");
 
-fprintf('Ισχύς στην έξοδο του Mixer = %.2f dBm\n', P_mix_out_dBm);
-
-%% Θεωρητικός έλεγχος
-P_mix_expected_dBm = P_I_split_dBm + G_MIX_dB;
-fprintf('Αναμενόμενη ισχύς στην έξοδο του Mixer = %.2f dBm\n', P_mix_expected_dBm);
-
-%% =========================================================
-% 27. Διάγραμμα σήματος στην έξοδο του mixer
-% =========================================================
-
-helper_funcs.Plot_RF_Signal(t, real(y_mix), "Πραγματικό μέρος σήματος στην έξοδο του Mixer");
-
-%% =========================================================
-% 28. Αστερισμός στην έξοδο του mixer
-% Κανονικοποιούμε μόνο για οπτική σύγκριση
-%%=========================================================
 sym_mix = y_mix(delay+1 : sps : end-delay);
 
 sym_mix_norm = sym_mix / sqrt(mean(abs(sym_mix).^2));
 
-helper_funcs.Plot_Constellation(sym_mix_norm, "Αστερισμός στην έξοδο του Mixer");
+helper_funcs.Plot_Constellation(sym_mix_norm, "Constellation after Mixer");
 
-%% =========================================================
-% 29. SNR και EVM στην έξοδο του mixer
-% Εφόσον εδώ εφαρμόζουμε μόνο conversion loss,
-% το SNR ιδανικά παραμένει αμετάβλητο
-% =========================================================
+% Υπολογισμός ισχύος στην έξοδο του mixer
+P_mix_out_dBm = 10*log10(mean(abs(y_mix_noisy).^2)/1e-3/50);
+P_mix_expected_dBm = P_split_expected_dBm + G_MixerI_dB;
 
-% Χωρίζουμε το "καθαρό" σήμα και τον θόρυβο μετά τον splitter
-y_I_split_clean = sqrt(G_PS_lin) * y_lna;
-y_I_split_noise = sqrt(G_PS_lin) * noise_lna;
+fprintf('Αναμενόμενη ισχύς στην έξοδο του Mixer = %.2f dBm\n', P_mix_expected_dBm);
+fprintf('Ισχύς στην έξοδο του Mixer = %.2f dBm\n', P_mix_out_dBm);
 
-% Περνάμε και τα δύο από τη conversion loss του mixer
-y_mix_clean = sqrt(G_MIX_lin) * y_I_split_clean;
-y_mix_noise = sqrt(G_MIX_lin) * y_I_split_noise;
-
-SNR_mix_dB = helper_funcs.Calculate_SNR(y_mix_clean, y_mix_noise);
+SNR_mix_dB = helper_funcs.Calculate_SNR(y_mix_clean, noise_after_mix);
 fprintf('SNR στην έξοδο του Mixer = %.2f dB\n', SNR_mix_dB);
 
-% EVM
 evm_percent = helper_funcs.Calculate_EVM(sym_samples, sym_mix);
 fprintf('EVM στην έξοδο του Mixer = %.2f %%\n', evm_percent);
 
 %% =========================================================
-% 30. 5η βαθμίδα δέκτη: LPF
-% Το LPF στο baseband κρατά το χρήσιμο φάσμα μέχρι ~3 GHz
-% και απορρίπτει θόρυβο εκτός ζώνης.
-% Επιπλέον εισάγει απώλεια περίπου -3.1 dB.
-% =========================================================
+% 5η βαθμίδα δέκτη: LPF
 
 G_LPF_dB  = -3.1;                   % insertion loss του LPF
 G_LPF_lin = 10^(G_LPF_dB/10);
+NF_LPF_dB = - G_ILPF_dB; % Not mentioned in the datasheet
+NF_LPF = helper_funcs.dB_To_Linear(NF_ILPF_dB, 'dB');
+
 
 fc_lpf = 3e9;                       % cutoff συχνότητα ~ 3 GHz
 Wn = fc_lpf / (Fs/2);               % κανονικοποιημένη συχνότητα για fir1
