@@ -91,7 +91,7 @@ NF_BPF_dB = - G_BPF_dB; % Not mentioned in the datasheet
 NF_BPF = helper_funcs.dB_To_Linear(NF_BPF_dB, 'dB');
 
 y_bpf = sqrt(G_BPF_lin) * rx_in;
-[y_bpf_noisy, SNR_out_BPF] = helper_funcs.Calcualte_noisy_signal(NF_BPF_dB, y_bpf, SNRin_dB);
+[y_bpf_noisy, SNR_out_BPF_dB, bpf_noise] = helper_funcs.Calcualte_noisy_signal(NF_BPF_dB, y_bpf, SNRin_dB);
 
 P_bpf_out_dBm = 10*log10(mean(abs(y_bpf).^2)/1e-3/50);
 P_bpf_expected_dBm = PRX_dBm + G_BPF_dB;
@@ -109,6 +109,12 @@ sym_bpf_norm = sym_bpf / sqrt(mean(abs(sym_bpf).^2));
 
 helper_funcs.Plot_Constellation(sym_bpf_norm, "Αστερισμός στην έξοδο του RF BPF");
 
+SNR_out_BPF_calc_dB = helper_funcs.Calculate_SNR(y_bpf, bpf_noise);
+fprintf('SNR στην έξοδο του BPF = %.2f dB\n', SNR_out_BPF_calc_dB);
+
+evm_percent = helper_funcs.Calculate_EVM(sym_samples, sym_lna);
+fprintf('EVM στην έξοδο του LNA = %.2f %%\n', evm_percent);
+
 %% =========================================================
 % 15. 2η βαθμίδα δέκτη: LNA
 % =========================================================
@@ -121,7 +127,7 @@ NF_LNA = helper_funcs.dB_To_Linear(NF_LNA_dB, 'dB');
 % Έξοδος LNA στο complex baseband:
 % το πλάτος του σήματος πολλαπλασιάζεται με sqrt(G)
 y_lna = sqrt(G_LNA_lin) * y_bpf;
-[y_lna_noisy, SNR_out_LNA] = helper_funcs.Calcualte_noisy_signal(NF_LNA_dB, y_lna, SNR_out_BPF);
+[y_lna_noisy, SNR_out_LNA] = helper_funcs.Calcualte_noisy_signal(NF_LNA_dB, y_lna, SNR_out_BPF_dB);
 
 % Real Part of the signal after the LNA with noise
 helper_funcs.Plot_RF_Signal(t, real(y_lna_noisy), "Real part of signal after LNA");

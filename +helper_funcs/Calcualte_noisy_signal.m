@@ -1,4 +1,4 @@
-function [noisy_signal,SNR_out_dB] = Calcualte_noisy_signal(NF_dB,signal_in, SNR_in_dB)
+function [noisy_signal,SNR_out_dB, noise] = Calcualte_noisy_signal(NF_dB,signal_in, SNR_in_dB)
 %CALCUALTE_NOISY_SIGNAL Summary of this function goes here
 %   Detailed explanation goes here
 arguments (Input)
@@ -10,6 +10,7 @@ end
 arguments (Output)
     noisy_signal
     SNR_out_dB
+    noise
 end
 
 % Υπολογισμός ισχύος σήματος στην έξοδο του stage
