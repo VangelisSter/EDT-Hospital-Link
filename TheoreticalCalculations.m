@@ -73,7 +73,7 @@ NF_QLPF = NF_ILPF;
 %%
 % Baseband Amplifier (BBA)
 G_BBA_dB = 20;
-G_BBA = 2 * helper_funcs.dB_To_Linear(G_BBA_dB, 'dB');
+G_BBA = helper_funcs.dB_To_Linear(G_BBA_dB, 'dB');
 NF_BBA_dB = 12.1;
 NF_BBA = helper_funcs.dB_To_Linear(NF_BBA_dB, 'dB');
 P1dB_BBA_dBm = 14.3;
@@ -89,17 +89,19 @@ NF_IVGA = helper_funcs.dB_To_Linear(NF_IVGA_dB, 'dB');
 P1dB_IVGA_dBm = -0.9;
 OIP3_IVGA_dBm = 17;
 OIP3_IVGA = helper_funcs.dB_To_Linear(OIP3_IVGA_dBm, 'dBm');
-IIP3_IVGA_dBm = G_IVGA_dB - OIP3_IVGA_dBm;
+IIP3_IVGA_dBm = OIP3_IVGA_dBm - G_IVGA_dB;
 %%
 % Q-channel Baseband VGA (QVGA)
 G_QVGA_dB = G_IVGA_dB;
 G_QVGA = G_IVGA;
 NF_QVGA_dB = NF_IVGA_dB;
 NF_QVGA = NF_IVGA;
-P1dB_QVGA_dB = P1dB_IVGA_dBm;
-OIP3_QVGA_dB = OIP3_IVGA_dBm;
 OIP3_QVGA = OIP3_IVGA;
-IIP3_QVGA_dB = IIP3_IVGA_dBm;
+P1dB_QVGA_dBm = P1dB_IVGA_dBm;
+OIP3_QVGA_dBm = OIP3_IVGA_dBm;
+IIP3_QVGA_dBm = IIP3_IVGA_dBm;
+
+
 %%
 % ADC
 ADC_Resolution = 12;
