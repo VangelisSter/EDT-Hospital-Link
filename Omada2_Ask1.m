@@ -19,6 +19,17 @@ syms = pskmod(idx, M, pi/4);
 % filtlen*sps + 1 = 81 so 81 coefficients, odd because rc is
 % symmetrical around 0
 rrc = rcosdesign( rolloff, filtlen, sps, 'sqrt');
+%%
+% Test
+figure;
+[pxx, f] = pwelch(rrc, [], [], [], Fs/1e9, 'centered');
+plot(f, 10*log10(pxx));
+xlabel('Συχνότητα (GHz)');
+ylabel('Power/frequency (dB/Hz)');
+title('Φάσμα Baseband RRC');
+grid on;
+xlim([-BW/(2*1e9) - 2  BW/(2*1e9) + 2]);
+%%
 % umpsample so each symbol becomes sps = 8 samples
 % rrc in each symbol
 tx_shaped = upfirdn(syms, rrc, sps);
