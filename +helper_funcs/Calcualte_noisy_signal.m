@@ -1,15 +1,14 @@
-function [noisy_signal,SNR_out_dB, noise] = Calcualte_noisy_signal(NF_dB,signal_in, SNR_in_dB)
+function [noisy_signal, noise] = Calcualte_noisy_signal(signal_in, SNR_in_dB, SNR_out_dB)
 %CALCUALTE_NOISY_SIGNAL Summary of this function goes here
 %   Detailed explanation goes here
 arguments (Input)
-    NF_dB
     signal_in
     SNR_in_dB
+    SNR_out_dB
 end
 
 arguments (Output)
-    noisy_signal
-    SNR_out_dB
+    noisy_signal 
     noise
 end
 
@@ -18,9 +17,6 @@ P_sig_out = mean(abs(signal_in).^2);
 
 % Προσεγγιστική μοντελοποίηση θορύβου:
 % θεωρούμε ότι ο θόρυβος που προστίθεται υποβαθμίζει το SNR
-
-% Το NF μειώνει το SNR στην έξοδο:
-SNR_out_dB = SNR_in_dB - NF_dB;
 
 P_noise_existing = P_sig_out / (10^(SNR_in_dB/10));
 
