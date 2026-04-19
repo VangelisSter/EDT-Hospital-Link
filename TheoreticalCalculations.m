@@ -82,7 +82,7 @@ OIP3_BBA = helper_funcs.dB_To_Linear(OIP3_BBA_dBm, 'dBm');
 IIP3_BBA_dBm = OIP3_BBA_dBm - G_BBA_dB;
 %%
 % I-channel Baseband VGA (IVGA)
-G_IVGA_dB = 16;
+G_IVGA_dB = - 1.8;
 G_IVGA = helper_funcs.dB_To_Linear(G_IVGA_dB, 'dB');
 NF_IVGA_dB = 14.7;
 NF_IVGA = helper_funcs.dB_To_Linear(NF_IVGA_dB, 'dB');
@@ -123,7 +123,7 @@ Sin_dBm = 10 * log10(Sin / 1e-3);
 
 %%
 % Total Gain Calculation
-G_Total = G_BPF_dB + G_LNA_dB + G_PS_dB + G_MixerI_dB + G_ILPF_dB + 2 * G_BBA_dB + G_IVGA_dB;
+G_Total = G_BPF_dB + G_LNA_dB + G_PS_dB + G_MixerI_dB + 2 * G_ILPF_dB + 3 * G_BBA_dB + G_IVGA_dB;
 
 Voltage_final = 705e-6 * 10 ^ (G_Total / 20);
 
@@ -133,11 +133,16 @@ fprintf("Total gain: %f dB\nFinal Vpp: %f V\n", G_Total, Voltage_final);
 % Total Noise Figure Calculation using 
 % For passive elements it's F = 1 + (L - 1) * T / T0, where L = 1 / G.
 % To calculate the NF in this cascade connection, we use Friis' Formula
-NF_total = NF_BPF + (NF_LNA - 1) / G_BPF + (NF_PS - 1) / (G_BPF * G_LNA) +...
-    (NF_MixerI - 1) / (G_BPF * G_LNA * G_PS) + (NF_ILPF - 1) / (G_BPF * G_LNA * G_PS * G_MixerI) +...
+NF_total = NF_LNA +...
+    (NF_BPF - 1) / G_LNA +...
+    (NF_PS - 1) / (G_BPF * G_LNA) +...
+    (NF_MixerI - 1) / (G_BPF * G_LNA * G_PS) +...
+    (NF_ILPF - 1) / (G_BPF * G_LNA * G_PS * G_MixerI) +...
     (NF_BBA - 1) / (G_BPF * G_LNA * G_PS * G_MixerI * G_ILPF) +...
-    (NF_BBA - 1) / (G_BPF * G_LNA * G_PS * G_MixerI * G_ILPF * G_BBA) + ...
-    (NF_IVGA - 1) / (G_BPF * G_LNA * G_PS * G_MixerI * G_ILPF * G_BBA * G_BBA);
+    (NF_BBA - 1) / (G_BPF * G_LNA * G_PS * G_MixerI * G_ILPF * G_BBA) +...
+    (NF_ILPF - 1) / (G_BPF * G_LNA * G_PS * G_MixerI * G_ILPF * G_BBA * G_BBA) +...
+    (NF_BBA - 1) / (G_BPF * G_LNA * G_PS * G_MixerI * G_ILPF * G_BBA * G_BBA * G_ILPF) +...
+    (NF_IVGA - 1) / (G_BPF * G_LNA * G_PS * G_MixerI * G_ILPF * G_BBA * G_BBA * G_ILPF * G_BBA);
 
 NF_total_dB = helper_funcs.Linear_To_dB(NF_total, 'dB');
 
@@ -146,21 +151,25 @@ fprintf("Total Noise Factor: %f\nTotal Noise Figure: %f dB\n", NF_total, NF_tota
 %%
 % Total IP3 calculation
 OIP3_total_linear_reciprocal =  1 / OIP3_IVGA + 1 / (G_IVGA * OIP3_BBA) +...
-    1 / (G_IVGA * G_BBA * OIP3_BBA) + 1 / (G_IVGA * G_BBA * G_BBA * OIP3_MixerI) +...
-    1 / (G_IVGA * G_BBA * G_BBA * G_MixerI * OIP3_LNA);
+    1 / (G_IVGA * G_BBA * OIP3_BBA) +...
+    1 / (G_IVGA * G_BBA ^ 2 * OIP3_BBA) +...
+    1 / (G_IVGA * G_BBA ^ 3 * OIP3_MixerI) +...
+    1 / (G_IVGA * G_BBA ^ 3 * G_MixerI * OIP3_LNA);
 OIP3_total = 1 / OIP3_total_linear_reciprocal;
 OIP3_total_dBm = helper_funcs.Linear_To_dB(OIP3_total, 'dBm');
 fprintf("Total OIP3: %f dBm\n", OIP3_total_dBm);
+fprintf("Total IIP3: %f dBm\n", OIP3_total_dBm - G_Total)
 %%
 % Dynamic Range calculation
 MDS = -174 + 10 * log10(B / 2) + NF_total_dB;
 P1dB_Input_VGA = P1dB_IVGA_dBm - 2 * helper_funcs.Linear_To_dB(G_Total, 'dB') + G_IVGA_dB;
-P1dB_Input_BBA2 = P1dB_BBA_dBm - 2 * helper_funcs.Linear_To_dB(G_Total, 'dB') + G_IVGA_dB + G_BBA_dB;
-P1dB_Input_BB1 = P1dB_BBA_dBm - 2 * helper_funcs.Linear_To_dB(G_Total, 'dB') + G_IVGA_dB + 2 * G_BBA_dB;
+P1dB_Input_BBA3 = P1dB_BBA_dBm - 2 * helper_funcs.Linear_To_dB(G_Total, 'dB') + G_IVGA_dB + G_BBA_dB;
+P1dB_Input_BBA2 = P1dB_BBA_dBm - 2 * helper_funcs.Linear_To_dB(G_Total, 'dB') + G_IVGA_dB + 2 * G_BBA_dB;
+P1dB_Input_BB1 = P1dB_BBA_dBm - 2 * helper_funcs.Linear_To_dB(G_Total, 'dB') + G_IVGA_dB + 3 * G_BBA_dB;
 P1dB_Input_MixerI = P1dB_MixerI_dBm - G_BPF_dB - G_LNA_dB - G_PS_dB;
 P1dB_Input_LNA = P1dB_LNA_dBm - G_BPF_dB;
 
-P1dB_Input = min([P1dB_Input_LNA, P1dB_Input_MixerI, P1dB_Input_BB1, P1dB_Input_BBA2, P1dB_Input_VGA]);
+P1dB_Input = min([P1dB_Input_LNA, P1dB_Input_MixerI, P1dB_Input_BB1, P1dB_Input_BBA2, P1dB_Input_BBA3, P1dB_Input_VGA]);
 
 DR = P1dB_Input - MDS;
 
