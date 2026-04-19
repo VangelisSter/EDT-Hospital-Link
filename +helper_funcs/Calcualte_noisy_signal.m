@@ -1,10 +1,11 @@
-function [noisy_signal, noise] = Calcualte_noisy_signal(signal_in, SNR_in_dB, SNR_out_dB)
+function [noisy_signal, noise] = Calcualte_noisy_signal(signal_in, SNR_in_dB, SNR_out_dB, flag)
 %CALCUALTE_NOISY_SIGNAL Summary of this function goes here
 %   Detailed explanation goes here
 arguments (Input)
     signal_in
     SNR_in_dB
     SNR_out_dB
+    flag
 end
 
 arguments (Output)
@@ -29,8 +30,13 @@ P_noise_to_add = max(P_noise_to_add, 0);
 
 
 % Δημιουργία μιγαδικού AWGN
-noise = sqrt(P_noise_to_add/2) * ...
-    (randn(size(signal_in)) + 1j*randn(size(signal_in)));
+if strcmp(flag,'complex')
+    noise = sqrt(P_noise_to_add/2) * ...
+        (randn(size(signal_in)) + 1j*randn(size(signal_in)));
+else
+    noise = sqrt(P_noise_to_add/2) * ...
+        (randn(size(signal_in)));
+end
 
 % Έξοδος LNA με θόρυβο
 noisy_signal = signal_in + noise;

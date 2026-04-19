@@ -1,24 +1,17 @@
-function evm_percent = Calculate_EVM(sym_samples,sym_noisy)
+function evm_percent = Calculate_EVM(y_clean,noise)
 %CALCULATE_EVM Summary of this function goes here
 %   Detailed explanation goes here
 arguments (Input)
-    sym_samples
-    sym_noisy
+    y_clean
+    noise
 end
 
 arguments (Output)
     evm_percent
 end
 
-% Παίρνουμε τα ιδανικά σύμβολα αναφοράς με ίδιο μήκος
-Nvalid = min(length(sym_samples), length(sym_noisy));
-ref_sym = sym_samples(1:Nvalid);
-rx_sym  = sym_noisy(1:Nvalid);
+rms_noise = sqrt(mean(abs(noise).^2));
+rms_signal = sqrt(mean(abs(y_clean).^2));
 
-% Κανονικοποίηση αναφοράς και ληφθέντων συμβόλων
-ref_sym = ref_sym / sqrt(mean(abs(ref_sym).^2));
-rx_sym  = rx_sym  / sqrt(mean(abs(rx_sym).^2));
-
-evm_rms = sqrt(mean(abs(rx_sym - ref_sym).^2) / mean(abs(ref_sym).^2));
-evm_percent = evm_rms * 100;
+evm_percent = (rms_noise / rms_signal) * 100;
 end

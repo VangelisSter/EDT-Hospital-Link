@@ -82,7 +82,7 @@ OIP3_BBA = helper_funcs.dB_To_Linear(OIP3_BBA_dBm, 'dBm');
 IIP3_BBA_dBm = OIP3_BBA_dBm - G_BBA_dB;
 %%
 % I-channel Baseband VGA (IVGA)
-G_IVGA_dB = 0;
+G_IVGA_dB = - 1.8;
 G_IVGA = helper_funcs.dB_To_Linear(G_IVGA_dB, 'dB');
 NF_IVGA_dB = 14.7;
 NF_IVGA = helper_funcs.dB_To_Linear(NF_IVGA_dB, 'dB');
@@ -151,21 +151,25 @@ fprintf("Total Noise Factor: %f\nTotal Noise Figure: %f dB\n", NF_total, NF_tota
 %%
 % Total IP3 calculation
 OIP3_total_linear_reciprocal =  1 / OIP3_IVGA + 1 / (G_IVGA * OIP3_BBA) +...
-    1 / (G_IVGA * G_BBA * OIP3_BBA) + 1 / (G_IVGA * G_BBA * G_BBA * OIP3_MixerI) +...
-    1 / (G_IVGA * G_BBA * G_BBA * G_MixerI * OIP3_LNA);
+    1 / (G_IVGA * G_BBA * OIP3_BBA) +...
+    1 / (G_IVGA * G_BBA ^ 2 * OIP3_BBA) +...
+    1 / (G_IVGA * G_BBA ^ 3 * OIP3_MixerI) +...
+    1 / (G_IVGA * G_BBA ^ 3 * G_MixerI * OIP3_LNA);
 OIP3_total = 1 / OIP3_total_linear_reciprocal;
 OIP3_total_dBm = helper_funcs.Linear_To_dB(OIP3_total, 'dBm');
 fprintf("Total OIP3: %f dBm\n", OIP3_total_dBm);
+fprintf("Total IIP3: %f dBm\n", OIP3_total_dBm - G_Total)
 %%
 % Dynamic Range calculation
 MDS = -174 + 10 * log10(B / 2) + NF_total_dB;
 P1dB_Input_VGA = P1dB_IVGA_dBm - 2 * helper_funcs.Linear_To_dB(G_Total, 'dB') + G_IVGA_dB;
-P1dB_Input_BBA2 = P1dB_BBA_dBm - 2 * helper_funcs.Linear_To_dB(G_Total, 'dB') + G_IVGA_dB + G_BBA_dB;
-P1dB_Input_BB1 = P1dB_BBA_dBm - 2 * helper_funcs.Linear_To_dB(G_Total, 'dB') + G_IVGA_dB + 2 * G_BBA_dB;
+P1dB_Input_BBA3 = P1dB_BBA_dBm - 2 * helper_funcs.Linear_To_dB(G_Total, 'dB') + G_IVGA_dB + G_BBA_dB;
+P1dB_Input_BBA2 = P1dB_BBA_dBm - 2 * helper_funcs.Linear_To_dB(G_Total, 'dB') + G_IVGA_dB + 2 * G_BBA_dB;
+P1dB_Input_BB1 = P1dB_BBA_dBm - 2 * helper_funcs.Linear_To_dB(G_Total, 'dB') + G_IVGA_dB + 3 * G_BBA_dB;
 P1dB_Input_MixerI = P1dB_MixerI_dBm - G_BPF_dB - G_LNA_dB - G_PS_dB;
 P1dB_Input_LNA = P1dB_LNA_dBm - G_BPF_dB;
 
-P1dB_Input = min([P1dB_Input_LNA, P1dB_Input_MixerI, P1dB_Input_BB1, P1dB_Input_BBA2, P1dB_Input_VGA]);
+P1dB_Input = min([P1dB_Input_LNA, P1dB_Input_MixerI, P1dB_Input_BB1, P1dB_Input_BBA2, P1dB_Input_BBA3, P1dB_Input_VGA]);
 
 DR = P1dB_Input - MDS;
 
